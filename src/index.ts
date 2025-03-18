@@ -168,10 +168,16 @@ const main = async (argv:string[]) => {
 	}
 
 	const args:Args = yargs(hideBin(argv))
-		.option('updatedb', {
+		.option('update-db', {
 			type: 'boolean',
 			description: 'Update the database'
 		})
+		.positional('search-term', {
+			type: 'string',
+			demandOption: false,
+			description: 'The term to search for',
+		})
+		.help()
 		.parse() as any;
 
 	const dbPath = await getDatabasePath();
@@ -182,7 +188,10 @@ const main = async (argv:string[]) => {
 		return;
 	}
 
-	if (!args._[0]) throw new Error('Seach term not specified');
+	if (!args._[0]) {
+		yargs.showHelp();
+		return;
+	}
 
 	const searchTerm = args._[0];
 	const db = new Database(dbPath);

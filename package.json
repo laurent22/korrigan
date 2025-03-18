@@ -7,7 +7,7 @@
     "korrigan": "./dist/index.js"
   },
   "scripts": {
-    "start": "node ./dist/index.js",
+    "start": "yarn tsc && node ./dist/index.js",
     "tsc": "tsc",
     "postbuild": "node ./tools/addShebang.js"
   },
