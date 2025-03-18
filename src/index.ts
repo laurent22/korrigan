@@ -64,6 +64,19 @@ const isFileExcluded = (name:string, exclusions:string[]) => {
 	return false;
 }
 
+const showTopFolders = (db:DatabaseType) => {
+	interface Row {
+		path: string;
+		total : number;
+	}
+
+	const rows = db.prepare('SELECT folders.path, count(*) as total FROM files LEFT JOIN folders ON files.folder_id = folders.id GROUP BY folders.id ORDER BY total DESC LIMIT 1000').all() as Row[];
+	
+	for (const row of rows) {
+		console.info(row.total.toString().padEnd(10, ' ') + row.path);
+	}
+}
+
 interface ProcessDirOptions {
 	dirExclusions: RegExp[];
 	fileExclusions: string[];
@@ -150,11 +163,48 @@ const searchFolders = async (db:DatabaseType, searchTerm:string) => {
 	return output;
 }
 
-const search = async (db:DatabaseType, searchTerm:string) => {
-	const fileResults = await searchFiles(db, searchTerm);
-	const folderResults = await searchFolders(db, searchTerm);
+const searchWithGlob = async(db:DatabaseType, searchTerm:string) => {
+	if (searchTerm.includes('**')) throw new Error('** is not supported');
 
-	const output = fileResults.concat(folderResults);
+	const sqlSearchTerm = searchTerm.replace(/\*/g, '%');
+
+	interface Row {
+		full_path: string;
+	}
+
+	const rows = db.prepare(`
+		SELECT 
+			folders.path || '/' || files.name AS full_path
+		FROM 
+			files
+		JOIN 
+			folders
+		ON 
+			files.folder_id = folders.id
+		WHERE full_path LIKE ?
+	`).all([sqlSearchTerm]) as Row[];
+
+	const output:string[] = [];
+
+	for (const row of rows) {
+		output.push(row.full_path);
+	}
+
+	return output;
+}
+
+const search = async (db:DatabaseType, searchTerms:string[]) => {
+	let output:string[] = [];
+
+	for (const searchTerm of searchTerms) {
+		if (searchTerm.includes('*')) {
+			output = output.concat(await searchWithGlob(db, searchTerm));
+		} else {
+			const fileResults = await searchFiles(db, searchTerm);
+			const folderResults = await searchFolders(db, searchTerm);
+			output = output.concat(fileResults.concat(folderResults));
+		}
+	}
 
 	output.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 	
@@ -165,6 +215,7 @@ const main = async (argv:string[]) => {
 	interface Args {
 		_: string[],
 		updateDb: boolean;
+		showTopFolders: boolean;
 	}
 
 	const args:Args = yargs(hideBin(argv))
@@ -172,10 +223,15 @@ const main = async (argv:string[]) => {
 			type: 'boolean',
 			description: 'Update the database'
 		})
-		.positional('search-term', {
+		.option('show-top-folders', {
+			type: 'boolean',
+			description: 'Show folders with the most files'
+		})
+		.positional('search-terms', {
 			type: 'string',
 			demandOption: false,
-			description: 'The term to search for',
+			array: true,
+			description: 'The terms to search for',
 		})
 		.help()
 		.parse() as any;
@@ -187,15 +243,21 @@ const main = async (argv:string[]) => {
 		await updateDatabase(config, dbPath);
 		return;
 	}
+	
+	const db = new Database(dbPath);
+
+	if (args.showTopFolders) {
+		showTopFolders(db);
+		return;
+	}
 
 	if (!args._[0]) {
 		yargs.showHelp();
 		return;
 	}
 
-	const searchTerm = args._[0];
-	const db = new Database(dbPath);
-	await search(db, searchTerm);
+	const searchTerms = args._;
+	await search(db, searchTerms);
 }
 
 main(process.argv).catch(error => {

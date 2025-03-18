@@ -12,12 +12,13 @@ Like locate but simpler.
 
 ```plaintext
 Positionals:
-  search-term  The term to search for                                   [string]
+  search-terms  The terms to search for                                 [string]
 
 Options:
-  --version   Show version number                                      [boolean]
-  --updatedb  Update the database                                      [boolean]
-  --help      Show help                                                [boolean]
+  --version           Show version number                              [boolean]
+  --update-db         Update the database                              [boolean]
+  --show-top-folders  Show folders with the most files                 [boolean]
+  --help              Show help                                        [boolean]
 ```
 
 ### Creating the configuration
@@ -80,7 +81,15 @@ This will create the database in `$HOME/.config/korrigan/database.sqlite` which 
 
 ### Searching
 
-Once the database is setup, search for terms using `korrigan myseach`
+- Simple search: `korrigan myseach`.
+
+- Search with wildcard: `korrigan '*.zip'`
+
+- Search for multiple terms: `korrigan '*.zip' '*.7z' '*.rar'`
+
+### Inspecting the database
+
+To view a list of folders that contain the most files, use `korrigan --show-top-folders`. This will print the list with the most voluminous folders at the top. This can help to exclude particulary large folders that you may not actually need.
 
 ### License
 
